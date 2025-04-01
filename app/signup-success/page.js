@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 
 export default function SignupSuccess() {
   const router = useRouter();
-  const [countdown, setCountdown] = useState(5);
+  const [countdown, setCountdown] = useState(1);
 
   useEffect(() => {
     if (countdown === 0) {

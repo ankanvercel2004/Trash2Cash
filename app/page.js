@@ -1,4 +1,27 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useSession } from "@/contexts/SessionContext";
+
 export default function Home() {
+  const { user, loading } = useSession();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!loading && user) {
+      router.push("/dashboard");
+    }
+  }, [user, loading, router]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        Loading...
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <main>
@@ -9,7 +32,8 @@ export default function Home() {
               Transform Your Trash into Cash
             </h1>
             <p className="text-xl text-gray-700 mb-8">
-              Join our platform to earn money by recycling waste in an eco-friendly way.
+              Join our platform to earn money by recycling waste in an
+              eco-friendly way.
             </p>
             <a
               href="/signup"
@@ -28,13 +52,15 @@ export default function Home() {
               <div className="p-6 bg-white rounded shadow hover:shadow-lg transition">
                 <h3 className="text-2xl font-bold mb-2">Easy Listing</h3>
                 <p className="text-gray-600">
-                  Quickly list your waste materials with simple, step-by-step guidance.
+                  Quickly list your waste materials with simple, step-by-step
+                  guidance.
                 </p>
               </div>
               <div className="p-6 bg-white rounded shadow hover:shadow-lg transition">
                 <h3 className="text-2xl font-bold mb-2">Real-Time Pricing</h3>
                 <p className="text-gray-600">
-                  Get updated pricing for your waste to ensure you’re getting the best value.
+                  Get updated pricing for your waste to ensure you’re getting
+                  the best value.
                 </p>
               </div>
               <div className="p-6 bg-white rounded shadow hover:shadow-lg transition">
@@ -54,7 +80,11 @@ export default function Home() {
               About Trash to Cash
             </h2>
             <p className="text-xl text-center text-gray-700 max-w-3xl mx-auto">
-              Trash to Cash is dedicated to revolutionizing waste management by turning your unwanted trash into a profitable asset. Our platform simplifies waste listing, offers real-time pricing, and schedules pickups, ensuring a seamless experience for users and a positive impact on the environment.
+              Trash to Cash is dedicated to revolutionizing waste management by
+              turning your unwanted trash into a profitable asset. Our platform
+              simplifies waste listing, offers real-time pricing, and schedules
+              pickups, ensuring a seamless experience for users and a positive
+              impact on the environment.
             </p>
           </div>
         </section>

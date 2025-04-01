@@ -2,7 +2,11 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { signInWithEmailAndPassword } from "firebase/auth";
+import {
+  signInWithEmailAndPassword,
+  GoogleAuthProvider,
+  signInWithPopup,
+} from "firebase/auth";
 import { auth } from "@/lib/firebase";
 
 export default function LoginPage() {
@@ -14,14 +18,23 @@ export default function LoginPage() {
   async function handleLogin(e) {
     e.preventDefault();
     setError(null);
-
     try {
-      // Directly sign in with Firebase Auth
+      // Sign in with email and password
       await signInWithEmailAndPassword(auth, email, password);
-      // onAuthStateChanged in SessionContext will detect the change
-      router.push("/");
+      router.push("/dashboard"); // Redirect to dashboard
     } catch (err) {
       setError(err.message || "Login failed!");
+    }
+  }
+
+  async function handleGoogleSignIn() {
+    setError(null);
+    const provider = new GoogleAuthProvider();
+    try {
+      await signInWithPopup(auth, provider);
+      router.push("/dashboard"); // Redirect to dashboard
+    } catch (err) {
+      setError(err.message || "Google login failed!");
     }
   }
 
@@ -54,9 +67,7 @@ export default function LoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="block w-full rounded-md border border-green-300 px-3 py-2
-                           focus:outline-none focus:ring-2 focus:ring-green-400
-                           focus:border-transparent"
+                className="block w-full rounded-md border border-green-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-400 focus:border-transparent"
               />
             </div>
             <div>
@@ -69,20 +80,22 @@ export default function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                className="block w-full rounded-md border border-green-300 px-3 py-2
-                           focus:outline-none focus:ring-2 focus:ring-green-400
-                           focus:border-transparent"
+                className="block w-full rounded-md border border-green-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-400 focus:border-transparent"
               />
             </div>
             <button
               type="submit"
-              className="w-full bg-green-600 text-white rounded-md py-2
-                         font-semibold hover:bg-green-700 transition-colors"
+              className="w-full bg-green-600 text-white rounded-md py-2 font-semibold hover:bg-green-700 transition-colors"
             >
               Login
             </button>
           </form>
-
+          <button
+            onClick={handleGoogleSignIn}
+            className="w-full mt-4 border border-green-600 text-green-600 rounded-md py-2 font-semibold hover:bg-green-600 hover:text-white transition-colors"
+          >
+            Sign in with Google
+          </button>
           <div className="mt-4 text-center text-sm text-gray-700">
             Don&apos;t have an account?{" "}
             <a
