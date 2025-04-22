@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useSession } from "@/contexts/SessionContext";
 import { useRouter } from "next/navigation";
+import { collection, query, where, getDocs } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 export default function AddListingPage() {
   const { user } = useSession();
@@ -12,10 +14,12 @@ export default function AddListingPage() {
   const [description, setDescription] = useState("");
   const [price, setPrice] = useState("");
   const [pickupDate, setPickupDate] = useState("");
-
-  // Image upload state (BLOB as Base64)
   const [selectedFile, setSelectedFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
+
+  // New state for user type and name
+  const [userType, setUserType] = useState("homeowner");
+  const [ownerName, setOwnerName] = useState("");
 
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -34,21 +38,60 @@ export default function AddListingPage() {
     const file = e.target.files[0];
     if (file) {
       setSelectedFile(file);
-      // Create a temporary preview URL for display
       setPreviewUrl(URL.createObjectURL(file));
     }
   };
+
+  // Fetch the user type & name from the "profiles" collection
+  useEffect(() => {
+    if (user) {
+      async function fetchProfile() {
+        try {
+          const q = query(
+            collection(db, "profiles"),
+            where("email", "==", user.email)
+          );
+          const querySnapshot = await getDocs(q);
+          if (!querySnapshot.empty) {
+            const data = querySnapshot.docs[0].data();
+
+            setUserType(data.userType || "homeowner");
+            // If you store the user's display name in "data.displayName" or "data.name"
+            // adjust accordingly. Fallback to user.displayName or user.email
+            setOwnerName(
+              data.displayName ||
+                data.name ||
+                user.displayName ||
+                user.email ||
+                "User"
+            );
+          } else {
+            // If there's no profile doc, default to "homeowner" and fallback name
+            setUserType("homeowner");
+            setOwnerName(user.displayName || user.email || "User");
+          }
+        } catch (err) {
+          console.error("Error fetching user profile:", err);
+          setError("Error fetching user profile");
+        }
+      }
+      fetchProfile();
+    }
+  }, [user]);
 
   async function handleAddListing(e) {
     e.preventDefault();
     setSaving(true);
     setError(null);
+
     let imageData = "";
     try {
       if (selectedFile) {
         imageData = await convertFileToBase64(selectedFile);
       }
-      // Create the listing via your API endpoint, including the Base64 image data
+
+      // Create the listing via your API endpoint,
+      // including the userType and ownerName
       const response = await fetch("/api/listings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -58,10 +101,13 @@ export default function AddListingPage() {
           price,
           pickupDate,
           userId: user?.uid,
-          imageData, // Save the Base64 image data
+          ownerType: userType,
+          ownerName, // <-- IMPORTANT: now included
+          imageData,
         }),
       });
       const data = await response.json();
+
       if (!response.ok) {
         setError(data.error || "Failed to add listing.");
       } else {

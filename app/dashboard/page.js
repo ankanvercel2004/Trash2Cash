@@ -18,6 +18,7 @@ export default function DashboardPage() {
   const [showModal, setShowModal] = useState(false);
   const [listingToDelete, setListingToDelete] = useState(null);
 
+  // Fetch user type from the "profiles" collection
   useEffect(() => {
     if (!loading && !user) {
       router.push("/login");
@@ -31,9 +32,12 @@ export default function DashboardPage() {
           const querySnapshot = await getDocs(q);
           if (!querySnapshot.empty) {
             const data = querySnapshot.docs[0].data();
+            // Expected values: "homeowner", "collector", or "corporation"
             setUserType(data.userType || "homeowner");
+            console.log("Fetched user type:", data.userType);
           } else {
             setUserType("homeowner");
+            console.log("No profile found; defaulting to homeowner");
           }
         } catch (err) {
           console.error("Error fetching user type:", err);
@@ -44,6 +48,7 @@ export default function DashboardPage() {
     }
   }, [user, loading, router]);
 
+  // Fetch listings based on userType
   useEffect(() => {
     if (user) {
       async function fetchListings() {
@@ -51,15 +56,38 @@ export default function DashboardPage() {
           const listingsRef = collection(db, "listings");
           let q;
           if (userType === "homeowner") {
+            // Homeowners see only their own listings.
             q = query(listingsRef, where("userId", "==", user.uid));
+            console.log(
+              "Querying listings for homeowner with userId =",
+              user.uid
+            );
+          } else if (userType === "collector") {
+            // Collectors see listings from homeowners and collectors.
+            q = query(
+              listingsRef,
+              where("ownerType", "in", ["homeowner", "collector"])
+            );
+            console.log(
+              "Querying listings for collector: ownerType in [homeowner, collector]"
+            );
+          } else if (userType === "corporation") {
+            // Corporations see only listings from collectors.
+            q = query(listingsRef, where("ownerType", "==", "collector"));
+            console.log(
+              "Querying listings for corporation: ownerType equals collector"
+            );
           } else {
+            // Fallback: show everything.
             q = query(listingsRef);
+            console.log("Fallback query: fetching all listings");
           }
           const querySnapshot = await getDocs(q);
           const listingsArr = [];
           querySnapshot.forEach((doc) => {
             listingsArr.push({ id: doc.id, ...doc.data() });
           });
+          console.log("Fetched listings:", listingsArr);
           setListings(listingsArr);
         } catch (err) {
           console.error("Error fetching listings:", err);
@@ -70,6 +98,7 @@ export default function DashboardPage() {
     }
   }, [user, userType]);
 
+  // Fetch transactions based on userType
   useEffect(() => {
     if (user) {
       async function fetchTransactions() {
@@ -80,6 +109,8 @@ export default function DashboardPage() {
             q = query(transactionsRef, where("userId", "==", user.uid));
           } else if (userType === "collector") {
             q = query(transactionsRef, where("collectorId", "==", user.uid));
+          } else if (userType === "corporation") {
+            q = query(transactionsRef, where("corporationId", "==", user.uid));
           } else {
             q = query(transactionsRef);
           }
@@ -98,6 +129,7 @@ export default function DashboardPage() {
     }
   }, [user, userType]);
 
+  // Modal handlers
   const openDeleteModal = (listingId) => {
     setListingToDelete(listingId);
     setShowModal(true);
@@ -133,6 +165,13 @@ export default function DashboardPage() {
     router.push(`/listings/edit/${listingId}`);
   };
 
+  // Chat function:
+  // - For a collector: If viewing a listing from a homeowner, show Chat.
+  // - For a corporation: If viewing a listing from a collector, show Chat.
+  const handleChat = (ownerId) => {
+    router.push(`/chat?target=${ownerId}`);
+  };
+
   const handleImageClick = (imageData) => {
     setSelectedImage(imageData);
     setShowModal(true);
@@ -161,100 +200,229 @@ export default function DashboardPage() {
                 Welcome, {user.displayName || "User"}!
               </h1>
               <p className="text-gray-600 mt-2">
-                Here’s an overview of your listings and transactions.
+                Role: {userType.charAt(0).toUpperCase() + userType.slice(1)}
+              </p>
+              <p className="text-gray-600 mt-2">
+                Here’s an overview of your dashboard.
               </p>
             </div>
             <div className="mt-4 md:mt-0">
-              <button
-                onClick={() => router.push("/listings/add")}
-                className="bg-emerald-600 text-white px-4 py-2 rounded-md hover:bg-emerald-700 transition shadow"
-              >
-                Add Listing
-              </button>
+              {/* Show "Add Listing" button for homeowners and collectors */}
+              {(userType === "homeowner" || userType === "collector") && (
+                <button
+                  onClick={() => router.push("/listings/add")}
+                  className="bg-emerald-600 text-white px-4 py-2 rounded-md hover:bg-emerald-700 transition shadow"
+                >
+                  Add Listing
+                </button>
+              )}
             </div>
           </div>
 
           {/* Summary Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-            {[["Total Listings", listings.length], ["Total Transactions", transactions.length]].map(
-              ([title, count], idx) => (
-                <Card
-                  key={idx}
-                  className="hover:scale-105 transition-transform duration-300 shadow-md hover:shadow-2xl fade-in"
-                >
-                  <CardHeader>
-                    <CardTitle>{title}</CardTitle>
-                  </CardHeader>
-                  <CardContent className="text-3xl font-bold text-green-700">
-                    {count}
-                  </CardContent>
-                </Card>
-              )
-            )}
+            {[
+              ["Total Listings", listings.length],
+              ["Total Transactions", transactions.length],
+            ].map(([title, count], idx) => (
+              <Card
+                key={idx}
+                className="hover:scale-105 transition-transform duration-300 shadow-md hover:shadow-2xl fade-in"
+              >
+                <CardHeader>
+                  <CardTitle>{title}</CardTitle>
+                </CardHeader>
+                <CardContent className="text-3xl font-bold text-green-700">
+                  {count}
+                </CardContent>
+              </Card>
+            ))}
           </div>
 
-          {/* Listings */}
-          <section className="mb-8">
-            <h2 className="text-3xl font-bold text-green-800 mb-4 fade-in">
-              Your Listings
-            </h2>
-            {error && (
-              <p className="text-red-600 text-center text-sm mb-4">{error}</p>
-            )}
-            {listings.length === 0 ? (
-              <p className="text-gray-700">No listings available.</p>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {listings.map((listing) => (
-                  <div
-                    key={listing.id}
-                    className="transition-all duration-300 hover:scale-[1.02] fade-in"
-                  >
-                    <Card className="bg-white/90 backdrop-blur-sm border border-green-100">
-                      <CardHeader className="flex justify-between items-center">
-                        <CardTitle>{listing.title}</CardTitle>
-                        <div className="flex space-x-2">
-                          <button
-                            onClick={() => handleUpdateListing(listing.id)}
-                            className="text-blue-600 hover:text-blue-800"
-                            title="Edit"
-                          >
-                            &#9998;
-                          </button>
-                          <button
-                            onClick={() => openDeleteModal(listing.id)}
-                            className="text-red-600 hover:text-red-800"
-                            title="Delete"
-                          >
-                            &#128465;
-                          </button>
-                        </div>
-                      </CardHeader>
-                      <CardContent>
-                        {listing.imageData && (
-                          <img
-                            src={listing.imageData}
-                            alt={listing.title}
-                            className="w-full h-40 object-cover rounded mb-2 cursor-pointer"
-                            onClick={() => handleImageClick(listing.imageData)}
-                          />
-                        )}
-                        <p className="text-gray-700">{listing.description}</p>
-                        <p className="mt-2 text-green-600 font-bold">
-                          ${listing.price}
-                        </p>
-                        <p className="mt-1 text-sm text-gray-600">
-                          Pickup Date: {listing.pickupDate}
-                        </p>
-                      </CardContent>
-                    </Card>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
+          {/* Listings Section */}
+          {userType === "collector" || userType === "corporation" ? (
+            // Available Listings for collectors and corporations
+            <section className="mb-8">
+              <h2 className="text-3xl font-bold text-green-800 mb-4 fade-in">
+                Available Listings
+              </h2>
+              {error && (
+                <p className="text-red-600 text-center text-sm mb-4">{error}</p>
+              )}
+              {listings.length === 0 ? (
+                <p className="text-gray-700">No listings available.</p>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {listings.map((listing) => (
+                    <div
+                      key={listing.id}
+                      className="transition-all duration-300 hover:scale-[1.02] fade-in"
+                    >
+                      <Card className="bg-white/90 backdrop-blur-sm border border-green-100">
+                        <CardHeader className="flex justify-between items-center">
+                          <CardTitle>{listing.title}</CardTitle>
+                          <div className="flex space-x-2">
+                            {listing.userId === user.uid ? (
+                              <>
+                                <button
+                                  onClick={() =>
+                                    handleUpdateListing(listing.id)
+                                  }
+                                  className="text-blue-600 hover:text-blue-800"
+                                  title="Edit"
+                                >
+                                  &#9998;
+                                </button>
+                                <button
+                                  onClick={() => openDeleteModal(listing.id)}
+                                  className="text-red-600 hover:text-red-800"
+                                  title="Delete"
+                                >
+                                  &#128465;
+                                </button>
+                              </>
+                            ) : (
+                              // Show Chat button when conditions are met:
+                              // - For a collector: if listing.ownerType is "homeowner"
+                              // - For a corporation: if listing.ownerType is "collector"
+                              ((userType === "collector" &&
+                                listing.ownerType === "homeowner") ||
+                                (userType === "corporation" &&
+                                  listing.ownerType === "collector")) && (
+                                <button
+                                  onClick={() => handleChat(listing.userId)}
+                                  className="bg-blue-600 text-white px-3 py-1 rounded-md text-sm hover:bg-blue-700 transition"
+                                  title="Chat"
+                                >
+                                  Chat
+                                </button>
+                              )
+                            )}
+                          </div>
+                        </CardHeader>
+                        <CardContent>
+                          {listing.imageData && (
+                            <img
+                              src={listing.imageData}
+                              alt={listing.title}
+                              className="w-full h-40 object-cover rounded mb-2 cursor-pointer"
+                              onClick={() =>
+                                handleImageClick(listing.imageData)
+                              }
+                            />
+                          )}
+                          <p className="text-gray-700">{listing.description}</p>
+                          {listing.ownerType === "homeowner" &&
+                            listing.ownerName && (
+                              <p className="text-sm text-gray-600">
+                                By: {listing.ownerName}
+                              </p>
+                            )}
+                          <p className="mt-2 text-green-600 font-bold">
+                            ${listing.price}
+                          </p>
+                          <p className="mt-1 text-sm text-gray-600">
+                            Pickup Date: {listing.pickupDate}
+                          </p>
+                        </CardContent>
+                      </Card>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+          ) : (
+            // For Homeowners – Your Listings
+            <section className="mb-8">
+              <h2 className="text-3xl font-bold text-green-800 mb-4 fade-in">
+                Your Listings
+              </h2>
+              {error && (
+                <p className="text-red-600 text-center text-sm mb-4">{error}</p>
+              )}
+              {listings.length === 0 ? (
+                <p className="text-gray-700">No listings available.</p>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {listings.map((listing) => (
+                    <div
+                      key={listing.id}
+                      className="transition-all duration-300 hover:scale-[1.02] fade-in"
+                    >
+                      <Card className="bg-white/90 backdrop-blur-sm border border-green-100">
+                        <CardHeader className="flex justify-between items-center">
+                          <CardTitle>{listing.title}</CardTitle>
+                          <div className="flex space-x-2">
+                            {listing.userId === user.uid ? (
+                              <>
+                                <button
+                                  onClick={() =>
+                                    handleUpdateListing(listing.id)
+                                  }
+                                  className="text-blue-600 hover:text-blue-800"
+                                  title="Edit"
+                                >
+                                  &#9998;
+                                </button>
+                                <button
+                                  onClick={() => openDeleteModal(listing.id)}
+                                  className="text-red-600 hover:text-red-800"
+                                  title="Delete"
+                                >
+                                  &#128465;
+                                </button>
+                              </>
+                            ) : (
+                              ((userType === "collector" &&
+                                listing.ownerType === "homeowner") ||
+                                (userType === "corporation" &&
+                                  listing.ownerType === "collector")) && (
+                                <button
+                                  onClick={() => handleChat(listing.userId)}
+                                  className="bg-blue-600 text-white px-3 py-1 rounded-md text-sm hover:bg-blue-700 transition"
+                                  title="Chat"
+                                >
+                                  Chat
+                                </button>
+                              )
+                            )}
+                          </div>
+                        </CardHeader>
+                        <CardContent>
+                          {listing.imageData && (
+                            <img
+                              src={listing.imageData}
+                              alt={listing.title}
+                              className="w-full h-40 object-cover rounded mb-2 cursor-pointer"
+                              onClick={() =>
+                                handleImageClick(listing.imageData)
+                              }
+                            />
+                          )}
+                          <p className="text-gray-700">{listing.description}</p>
+                          {listing.ownerType === "homeowner" ||
+                            (listing.ownerType === "collector" &&
+                              listing.ownerName && (
+                                <p className="text-sm text-gray-600">
+                                  By: {listing.ownerName}
+                                </p>
+                              ))}
+                          <p className="mt-2 text-green-600 font-bold">
+                            ${listing.price}
+                          </p>
+                          <p className="mt-1 text-sm text-gray-600">
+                            Pickup Date: {listing.pickupDate}
+                          </p>
+                        </CardContent>
+                      </Card>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+          )}
 
-          {/* Transactions */}
+          {/* Transactions Section */}
           <section>
             <h2 className="text-3xl font-bold text-green-800 mb-4 fade-in">
               Transactions
