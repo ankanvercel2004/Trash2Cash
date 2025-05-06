@@ -33,9 +33,11 @@ export default function ListingRequestsPage() {
   }, [sessionLoading, listingId]);
 
   const handleAccept = async (reqId, loc, contact) => {
+    // 1) accept the request
     await acceptRequest(reqId, loc, contact);
-
-    await updateListingStatus(listingId, "accepted");
+    // 2) mark the listing as sold
+    await updateListingStatus(listingId, "sold");
+    // 3) update local state
     setRequests((rs) =>
       rs.map((r) =>
         r.id === reqId
@@ -117,27 +119,74 @@ export default function ListingRequestsPage() {
   );
 }
 
+// ——————————————————————————————————————————
+// AcceptForm with validation:
+// ——————————————————————————————————————————
 function AcceptForm({ req, onAccept }) {
   const [loc, setLoc] = useState("");
   const [contact, setContact] = useState("");
+  const [errors, setErrors] = useState({});
+
+  // Validate fields and call onAccept only when valid
+  const handleClick = () => {
+    const errs = {};
+
+    // Location required
+    if (!loc.trim()) {
+      errs.loc = "Pickup location is required.";
+    }
+
+    // Contact number must be exactly 10 digits
+    const digitsOnly = contact.replace(/\D/g, "");
+    if (!contact.trim()) {
+      errs.contact = "Contact number is required.";
+    } else if (!/^\d{10}$/.test(digitsOnly)) {
+      errs.contact = "Contact must be exactly 10 digits.";
+    }
+
+    if (Object.keys(errs).length) {
+      setErrors(errs);
+      return;
+    }
+
+    // no errors → clear and proceed
+    setErrors({});
+    onAccept(req.id, loc.trim(), digitsOnly);
+  };
 
   return (
-    <div className="mt-3 flex space-x-2">
-      <input
-        placeholder="Pickup Location"
-        value={loc}
-        onChange={(e) => setLoc(e.target.value)}
-        className="border rounded px-2 py-1 flex-1"
-      />
-      <input
-        placeholder="Contact #"
-        value={contact}
-        onChange={(e) => setContact(e.target.value)}
-        className="border rounded px-2 py-1 w-32"
-      />
+    <div className="mt-3 space-y-2">
+      <div>
+        <input
+          placeholder="Pickup Location"
+          value={loc}
+          onChange={(e) => setLoc(e.target.value)}
+          className={`w-full border rounded px-3 py-2 focus:outline-none ${
+            errors.loc ? "border-red-500" : "border-gray-300"
+          }`}
+        />
+        {errors.loc && (
+          <p className="mt-1 text-red-600 text-sm">{errors.loc}</p>
+        )}
+      </div>
+
+      <div>
+        <input
+          placeholder="Contact #"
+          value={contact}
+          onChange={(e) => setContact(e.target.value)}
+          className={`w-full border rounded px-3 py-2 focus:outline-none ${
+            errors.contact ? "border-red-500" : "border-gray-300"
+          }`}
+        />
+        {errors.contact && (
+          <p className="mt-1 text-red-600 text-sm">{errors.contact}</p>
+        )}
+      </div>
+
       <button
-        onClick={() => onAccept(req.id, loc, contact)}
-        className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-500"
+        onClick={handleClick}
+        className="mt-1 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-500"
       >
         Accept
       </button>

@@ -3,7 +3,12 @@
 
 import { useState } from "react";
 
-export default function ListingCard({ listing, actionLabel, onAction, disabled }) {
+export default function ListingCard({
+  listing,
+  actionLabel,
+  onAction,
+  disabled = false,
+}) {
   const [loading, setLoading] = useState(false);
 
   const handleClick = async () => {
@@ -35,15 +40,21 @@ export default function ListingCard({ listing, actionLabel, onAction, disabled }
 
       {/* Details */}
       <div className="p-4 flex-1 flex flex-col">
-        <h2 className="text-lg font-semibold text-gray-800 mb-2">
+        {/* Title */}
+        <h2 className="text-lg font-semibold text-gray-800 mb-1">
           {listing.title}
         </h2>
 
-        {/* Full description, preserving line breaks */}
-        <p className="text-gray-700 flex-1 whitespace-pre-wrap mb-4">
-          {listing.description}
+        {/* Type & Price */}
+        <p className="text-sm text-gray-600 mb-2">
+          <span className="font-medium">{listing.wasteType}</span> — ₹
+          {listing.price}
         </p>
 
+        {/* Description */}
+        <p className="text-gray-700 flex-1 mb-4">{listing.description}</p>
+
+        {/* Request Button */}
         <button
           onClick={handleClick}
           disabled={disabled || loading}
